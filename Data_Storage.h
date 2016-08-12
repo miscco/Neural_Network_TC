@@ -25,10 +25,12 @@
 /****************************************************************************************************/
 #pragma once
 #include <vector>
+
 #include "Inhibitory_Neuron.h"
 #include "Pyramidal_Neuron.h"
 #include "Reticular_Neuron.h"
 #include "Thalamocortical_Neuron.h"
+
 using std::vector;
 /****************************************************************************************************/
 /*											Save data												*/
@@ -39,7 +41,6 @@ inline void get_data(int counter,
 					 vector<Thalamocortical_Neuron>& TC,
 					 vector<Reticular_Neuron>& RE,
 					 vector<double*> pData) {
-
 	/* Parameters for the parallelization */
 	extern const int N_Cores;
 
@@ -47,13 +48,15 @@ inline void get_data(int counter,
 	 * has to be adapted! For an NxM matrix A, element A(i,j) is accessed by A(j+i*M) rather than
 	 * the usual A(i+j*N)
 	 */
-	#pragma omp parallel for num_threads(N_Cores) schedule(static)
+	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
 	for(unsigned i=0; i < PY.size(); i++)
 		pData[0][i+PY.size()*counter] = PY[i].Vs[0];
-	#pragma omp parallel for num_threads(N_Cores) schedule(static)
+
+	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
 	for(unsigned i=0; i < IN.size(); i++)
 		pData[1][i+IN.size()*counter] = IN[i].V [0];
-	#pragma omp parallel for num_threads(N_Cores) schedule(static)
+
+	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
 	for(unsigned i=0; i < PY.size(); i++)
 		pData[2][i+PY.size()*counter] = PY[i].Ca[0];
 }
