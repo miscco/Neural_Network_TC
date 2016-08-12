@@ -1,46 +1,5 @@
 #include "Pyramidal_Neuron.h"
 /****************************************************************************************************/
-/*										 Initialization of RNG 										*/
-/****************************************************************************************************/
-void Pyramidal_Neuron::set_RNG(void) {
-	extern const double dt;
-	/* Number of independent random variables */
-	int N = 2;
-
-	/* Create RNG for each stream */
-	for (int i=0; i<N; ++i){
-		/* Add the RNG for I_{l}*/
-		MTRands.push_back({ENG(rand()), DIST (0.0, dphi*dt)});
-
-		/* Add the RNG for I_{l,0} */
-		MTRands.push_back({ENG(rand()), DIST (0.0, dt)});
-
-		/* Get the random number for the first iteration */
-		Rand_vars.push_back(MTRands[2*i]());
-		Rand_vars.push_back(MTRands[2*i+1]());
-	}
-}
-/****************************************************************************************************/
-/*										 		end			 										*/
-/****************************************************************************************************/
-
-
-/****************************************************************************************************/
-/*										 RK noise inputs 											*/
-/****************************************************************************************************/
-double Pyramidal_Neuron::noise_xRK(int N, int M) const{
-	return (Rand_vars[2*M] + Rand_vars[2*M+1]/std::sqrt(3))*B[N];
-}
-
-double Pyramidal_Neuron::noise_aRK(int M) const{
-	return (Rand_vars[2*M] - Rand_vars[2*M+1]*std::sqrt(3))/4;
-}
-/****************************************************************************************************/
-/*										 		end			 										*/
-/****************************************************************************************************/
-
-
-/****************************************************************************************************/
 /*										 Current functions 											*/
 /****************************************************************************************************/
 /* Somatic currents */
@@ -125,46 +84,35 @@ double Pyramidal_Neuron::I_AR(int N)  const{
 
 
 /****************************************************************************************************/
-/*											Connectivity	 										*/
-/****************************************************************************************************/
-void Pyramidal_Neuron::set_Connections(vector<Pyramidal_Neuron*>& PY,
-                                       vector<Inhibitory_Neuron*>& IN,
-                                       vector<Thalamocortical_Neuron*>& TC) {
-    PY_Con = PY;
-    IN_Con = IN;
-    TC_Con = TC;
-}
-/****************************************************************************************************/
-/*										 		end			 										*/
-/****************************************************************************************************/
-
-
-/****************************************************************************************************/
 /*										 Synaptic currents	 										*/
 /****************************************************************************************************/
 double Pyramidal_Neuron::I_AMPA(int N)  const{
 	double tot_s_AMPA = 0.0;
-	for (unsigned i=0; i<PY_Con.size(); ++i) {
+	for (unsigned i=0; i < PY_Con.size(); i++)
 		tot_s_AMPA += PY_Con[i]->s_AMPA[N];
-	}
+	for (unsigned i=0; i < TC_Con.size(); i++)
+		tot_s_AMPA += TC_Con[i]->s_AMPA[N];
+
 	double I = g_AMPA * tot_s_AMPA * (Vd[N] - E_AMPA);
 	return I;
 }
 
 double Pyramidal_Neuron::I_NMDA(int N)  const{
 	double tot_s_NMDA = 0.0;
-	for (unsigned i=0; i<PY_Con.size(); ++i) {
+	for (unsigned i=0; i < PY_Con.size(); i++)
 		tot_s_NMDA += PY_Con[i]->s_NMDA[N];
-	}
+	for (unsigned i=0; i < TC_Con.size(); i++)
+		tot_s_NMDA += TC_Con[i]->s_NMDA[N];
+
 	double I = g_NMDA * tot_s_NMDA * (Vd[N] - E_NMDA);
 	return I;
 }
 
 double Pyramidal_Neuron::I_GABA(int N)  const{
 	double tot_s_GABA = 0.0;
-	for (unsigned i=0; i<IN_Con.size(); ++i) {
+	for (unsigned i=0; i < IN_Con.size(); i++)
 		tot_s_GABA += IN_Con[i]->s_GABA[N];
-	}
+
 	double I = g_GABA * tot_s_GABA * (Vd[N] - E_GABA);
 	return I;
 }

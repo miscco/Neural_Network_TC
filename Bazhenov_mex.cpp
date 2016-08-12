@@ -1,5 +1,5 @@
 /*
-*	Copyright (c) 2015 Michael Schellenberger Costa mschellenbergercosta@gmail.com
+*	Copyright (c) 2016 Michael Schellenberger Costa mschellenbergercosta@gmail.com
 *
 *	Permission is hereby granted, free of charge, to any person obtaining a copy
 *	of this software and associated documentation files (the "Software"), to deal
@@ -21,58 +21,95 @@
 */
 
 /****************************************************************************************************/
-/*		Main file for compilation tests																*/
+/* 		Implementation of the Bazhenov2002 model as MATLAB routine (mex compiler)					*/
+/* 		mex command is given by:																	*/
+/* 		mex CXXFLAGS="\$CXXFLAGS -std=c++11 -O3 -fopenmp"											*/
+/*			Bazhenov.cpp Pyramidal_Neuron.cpp Inhibitory_Neuron.cpp									*/
 /*		The Simulation requires the following boost libraries:	Random								*/
 /****************************************************************************************************/
-#include <iostream>
-#include <chrono>
-#include "Pyramidal_Neuron.h"
-#include "Inhibitory_Neuron.h"
+#include "mex.h"
+#include "matrix.h"
+
+#include "Data_Storage.h"
 #include "Initialize_Neurons.h"
-#include "ODE.h"
+#include "Iterate_ODE.h"
 
 /****************************************************************************************************/
 /*										Fixed simulation settings									*/
 /****************************************************************************************************/
-typedef std::chrono::high_resolution_clock::time_point timer;
-extern const int T		= 10;								/* Simulation length s					*/
-extern const int res 	= 5E4;								/* number of iteration steps per s		*/
-extern const double dt 	= 1E3/res;							/* duration of a timestep in ms			*/
+extern const int T		= 10;								/* Simulation length in s				*/
+extern const int res 	= 5E4;								/* Number of iteration steps per s		*/
+extern const int red 	= 1E1;								/* Fraction of stime steps saved		*/
+extern const double dt 	= 1E3/res;							/* Duration of a timestep in ms			*/
 extern const int N_e	= 128;								/* Number of pyramidal  cells			*/
 extern const int N_i	= 32;								/* Number of inhibitory cells			*/
-extern const int N_Cores= 5;								/* Number of CPU cores					*/
-extern const int Length = T*res;
+extern const int N_t	= 128;								/* Number of thalamocortical cells		*/
+extern const int N_r	= 32;								/* Number of thalamic reticular cells	*/
+extern const int N_Cores= 7;								/* Number of CPU cores					*/
 /****************************************************************************************************/
 /*										 		end			 										*/
 /****************************************************************************************************/
-
+mxArray* SetMexArray(int N, int M);
 
 /****************************************************************************************************/
-/*										Main simulation routine										*/
+/*										Simulation routine	 										*/
+/*										lhs defines outputs											*/
+/*										rhs defines inputs											*/
 /****************************************************************************************************/
-int main(void) {
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
+	/* Set the seed */
+	srand(time(NULL));
 
 	/* Initialize the populations */
-	/* Take the time of the simulation */
-	timer start,end;
 	vector<Pyramidal_Neuron> PY(0);
 	vector<Inhibitory_Neuron> IN(0);
+	vector<Thalamocortical_Neuron> TC(0);
+	vector<Reticular_Neuron> RE(0);
+	setupNetwork(PY, IN, TC, RE);
 
-	Initialize_Neurons(PY, IN);
+	/* Data container in MATLAB format */
+	vector<mxArray*> Data;
+	Data.push_back(SetMexArray(N_e, T*res/red));	// Ve
+	Data.push_back(SetMexArray(N_i, T*res/red));	// Vi
+	Data.push_back(SetMexArray(N_e, T*res/red));	// Ca
+
+	/* Pointer to the data blocks */
+	vector<double*> pData(Data.size(), NULL);
+	for(unsigned i=0; i<Data.size(); ++i)
+		pData[i] = mxGetPr(Data[i]);
 
 	/* Simulation */
-	start = std::chrono::high_resolution_clock::now();
+	int count = 0;
 	for (int t=0; t< T*res; ++t) {
 		Iterate_ODE(PY, IN);
-	}
-	end = std::chrono::high_resolution_clock::now();
+		if(t%red==0){
+			get_data(count, PY, IN, pData);
+			count++;
+		}
 
-	/* Time consumed by the simulation */
-	double dif = 1E-3*std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count();
-	std::cout << "simulation done!\n";
-	std::cout << "took " << dif 	<< " seconds" << "\n";
-	std::cout << "end\n";
+	}
+
+	/* Return the data containers */
+	for(unsigned i=0; i<Data.size(); ++i)
+		plhs[i] = Data[i];
+
+	return;
 }
 /****************************************************************************************************/
 /*										 		end			 										*/
+/****************************************************************************************************/
+
+
+/****************************************************************************************************/
+/*									Create MATLAB data container									*/
+/****************************************************************************************************/
+mxArray* SetMexArray(int N, int M) {
+	mxArray* Array	= mxCreateDoubleMatrix(0, 0, mxREAL);
+	mxSetM(Array, N);
+	mxSetN(Array, M);
+	mxSetData(Array, mxMalloc(sizeof(double)*M*N));
+	return Array;
+}
+/****************************************************************************************************/
+/*										 		end													*/
 /****************************************************************************************************/

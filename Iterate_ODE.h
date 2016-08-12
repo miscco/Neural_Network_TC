@@ -1,5 +1,5 @@
 /*
-*	Copyright (c) 2015 Michael Schellenberger Costa mschellenbergercosta@gmail.com
+*	Copyright (c) 2016 Michael Schellenberger Costa mschellenbergercosta@gmail.com
 *
 *	Permission is hereby granted, free of charge, to any person obtaining a copy
 *	of this software and associated documentation files (the "Software"), to deal
@@ -23,32 +23,47 @@
 #define ODE_H
 #include <cmath>
 #include <vector>
-#include "Pyramidal_Neuron.h"
 #include "Inhibitory_Neuron.h"
-using std::vector;
+#include "Pyramidal_Neuron.h"
+#include "Reticular_Neuron.h"
+#include "Thalamocortical_Neuron.h"
 
-void Iterate_ODE(vector<Pyramidal_Neuron>& PY, vector<Inhibitory_Neuron>& IN) {
+void Iterate_ODE(std::vector<Pyramidal_Neuron>& PY,
+				 std::vector<Inhibitory_Neuron>& IN,
+				 std::vector<Thalamocortical_Neuron>& TC,
+				 std::vector<Reticular_Neuron>& RE) {
 	/* Parameters for the parallelization */
 	extern const int N_Cores;
-	extern const int N_e, N_i;
 
 	/* First get all the RK terms */
-	for (int i=0; i<4; ++i) {
+	for (int i=0; i < 4; i++) {
 		#pragma omp parallel for num_threads(N_Cores) schedule(static)
-		for(int j=0; j<N_e; ++j)
+		for(unsigned j=0; j < PY.size(); j++)
 			PY[j].set_RK(i);
 		#pragma omp parallel for num_threads(N_Cores) schedule(static)
-		for(int j=0; j<N_i; ++j)
+		for(unsigned j=0; j < IN.size(); j++)
 			IN[j].set_RK(i);
+		#pragma omp parallel for num_threads(N_Cores) schedule(static)
+		for(unsigned j=0; j < TC.size(); j++)
+			TC[j].set_RK(i);
+		#pragma omp parallel for num_threads(N_Cores) schedule(static)
+		for(unsigned j=0; j < RE.size(); j++)
+			RE[j].set_RK(i);
 	}
 
 	/* Add the RK terms up*/
 	#pragma omp parallel for num_threads(N_Cores) schedule(static)
-	for(int j=0; j<N_e; ++j)
+	for(unsigned j=0; j < PY.size(); j++)
 		PY[j].add_RK();
 	#pragma omp parallel for num_threads(N_Cores) schedule(static)
-	for(int j=0; j<N_i; ++j)
+	for(unsigned j=0; j < IN.size(); j++)
 		IN[j].add_RK();
+	#pragma omp parallel for num_threads(N_Cores) schedule(static)
+	for(unsigned j=0; j < TC.size(); j++)
+		TC[j].add_RK();
+	#pragma omp parallel for num_threads(N_Cores) schedule(static)
+	for(unsigned j=0; j < RE.size(); j++)
+		RE[j].add_RK();
 }
 
 #endif // ODE_H

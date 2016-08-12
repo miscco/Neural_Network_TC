@@ -52,43 +52,35 @@ double Inhibitory_Neuron::beta_n_K(int N)  const{
 
 
 /****************************************************************************************************/
-/*											Connectivity	 										*/
-/****************************************************************************************************/
-void Inhibitory_Neuron::set_Connections(vector<Pyramidal_Neuron*>& PY, vector<Inhibitory_Neuron*>& IN) {
-	PY_Con = PY;
-	IN_Con = IN;
-}
-/****************************************************************************************************/
-/*										 		end			 										*/
-/****************************************************************************************************/
-
-
-/****************************************************************************************************/
 /*										 Synaptic currents	 										*/
 /****************************************************************************************************/
 double Inhibitory_Neuron::I_AMPA(int N)  const{
 	double tot_s_AMPA = 0.0;
-	for (unsigned i=0; i<PY_Con.size(); ++i){
+	for (unsigned i=0; i<PY_Con.size(); i++)
 		tot_s_AMPA += PY_Con[i]->s_AMPA[N];
-	}
+	for (unsigned i=0; i<TC_Con.size(); i++)
+		tot_s_AMPA += TC_Con[i]->s_AMPA[N];
+
 	double I = g_AMPA * tot_s_AMPA * (V[N] - E_AMPA);
 	return I;
 }
 
 double Inhibitory_Neuron::I_NMDA(int N)  const{
 	double tot_s_NMDA = 0.0;
-	for (unsigned i=0; i<PY_Con.size(); ++i){
+	for (unsigned i=0; i<PY_Con.size(); i++)
 		tot_s_NMDA += PY_Con[i]->s_NMDA[N];
-	}
+	for (unsigned i=0; i<TC_Con.size(); i++)
+		tot_s_NMDA += TC_Con[i]->s_NMDA[N];
+
 	double I = g_NMDA * tot_s_NMDA * (V[N] - E_NMDA);
 	return I;
 }
 
 double Inhibitory_Neuron::I_GABA(int N)  const{
 	double tot_s_GABA = 0.0;
-	for (unsigned i=0; i<IN_Con.size(); ++i){
+	for (unsigned i=0; i<IN_Con.size(); i++)
 		tot_s_GABA += IN_Con[i]->s_GABA[N];
-	}
+
 	double I = g_GABA* tot_s_GABA * (V[N] - E_GABA);
 	return I;
 }

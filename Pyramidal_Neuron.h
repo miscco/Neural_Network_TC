@@ -1,5 +1,5 @@
 /*
-*	Copyright (c) 2015 Michael Schellenberger Costa mschellenbergercosta@gmail.com
+*	Copyright (c) 2016 Michael Schellenberger Costa mschellenbergercosta@gmail.com
 *
 *	Permission is hereby granted, free of charge, to any person obtaining a copy
 *	of this software and associated documentation files (the "Software"), to deal
@@ -24,24 +24,14 @@
 #pragma once
 #include <cmath>
 #include <vector>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+
 #include "Inhibitory_Neuron.h"
 #include "Thalamocortical_Neuron.h"
+
 using std::vector;
 class Inhibitory_Neuron;
+class Reticular_Neuron;
 class Thalamocortical_Neuron;
-/****************************************************************************************************/
-/*										Typedefs for RNG											*/
-/****************************************************************************************************/
-typedef boost::random::mt11213b                    	ENG;    /* Mersenne Twister		*/
-typedef boost::random::normal_distribution<double>	DIST;   /* Normal Distribution	*/
-typedef boost::random::variate_generator<ENG,DIST> 	GEN;    /* Variate generator	*/
-/****************************************************************************************************/
-/*										 		end			 										*/
-/****************************************************************************************************/
-
 
 /****************************************************************************************************/
 /*									Macro for vector initialization									*/
@@ -60,76 +50,55 @@ typedef boost::random::variate_generator<ENG,DIST> 	GEN;    /* Variate generator
 
 class Pyramidal_Neuron {
 public:
-	Pyramidal_Neuron(void)
-	{set_RNG();}
+	Pyramidal_Neuron(void)	{}
 
-    Pyramidal_Neuron(vector<double> Param, vector<double>Connectivity)
-    : PY_Con(Connectivity[0], NULL),
-      IN_Con(Connectivity[1], NULL),
-      TC_Con(Connectivity[2], NULL),
-      E_L(Param[0]), g_L(Param[1]), g_sd(Param[2])
-	{set_RNG();}
-
-	/* Connect the Neuron with the target neurons */
-    void    set_Connections(vector<Pyramidal_Neuron*>&,
-                            vector<Inhibitory_Neuron*>&,
-                            vector<Thalamocortical_Neuron*>&);
+	Pyramidal_Neuron(vector<double> Param)
+	: E_L(Param[0]), g_L(Param[1]), g_sd(Param[2])
+	{}
 
 	/* Set strength of input current */
-	void	set_Input(double I) {Input = I;}
+	void	setInput(double I) {Input = I;}
 
 	/* ODE functions */
 	void	set_RK		(int);
 	void 	add_RK	 	(void);
 
 private:
-    /* Initialize the random number generators */
-    void	set_RNG(void);
+	/* Current functions */
+	double	I_L		(int) const;
+	double	I_Na	(int) const;
+	double	I_K		(int) const;
+	double	I_A		(int) const;
+	double	I_KS	(int) const;
+	double	I_KNa	(int) const;
+	double	I_sd	(int) const;
 
-    /* Noise function */
-    double 	noise_xRK 	(int, int) const;
-    double 	noise_aRK 	(int) const;
+	double	I_Ca	(int) const;
+	double	I_KCa	(int) const;
+	double	I_NaP	(int) const;
+	double	I_AR	(int) const;
 
-    /* Current functions */
-    double	I_L		(int) const;
-    double	I_Na	(int) const;
-    double	I_K		(int) const;
-    double	I_A		(int) const;
-    double	I_KS	(int) const;
-    double	I_KNa	(int) const;
-    double	I_sd	(int) const;
+	double	I_AMPA	(int) const;
+	double	I_NMDA	(int) const;
+	double	I_GABA	(int) const;
 
-    double	I_Ca	(int) const;
-    double	I_KCa	(int) const;
-    double	I_NaP	(int) const;
-    double	I_AR	(int) const;
+	/* Gating functions */
+	double alpha_h_Na(int) const;
+	double alpha_n_K (int) const;
+	double beta_h_Na (int) const;
+	double beta_n_K  (int) const;
 
-    double	I_AMPA	(int) const;
-    double	I_NMDA	(int) const;
-    double	I_GABA	(int) const;
+	double h_A_inf	(int) const;
+	double m_KS_inf	(int) const;
+	double tau_m_KS	(int) const;
 
-    /* Gating functions */
-    double alpha_h_Na(int) const;
-    double alpha_n_K (int) const;
-    double beta_h_Na (int) const;
-    double beta_n_K  (int) const;
-
-    double h_A_inf	(int) const;
-    double m_KS_inf	(int) const;
-    double tau_m_KS	(int) const;
-
-    /* Sodium pump */
-    double Na_pump	(int) const;
-	/* Random number generators */
-	vector<GEN>		MTRands;
-
-	/* Container for noise */
-	vector<double>	Rand_vars;
+	/* Sodium pump */
+	double Na_pump	(int) const;
 
 	/* Connections (Neurons that target THIS Neuron*/
 	vector<Pyramidal_Neuron*>  PY_Con;
 	vector<Inhibitory_Neuron*> IN_Con;
-    vector<Thalamocortical_Neuron*> TC_Con;
+	vector<Thalamocortical_Neuron*> TC_Con;
 
 	/* Paramter constants */
 	/* Membrane conductivity */
@@ -192,9 +161,9 @@ private:
 	/* Input current */
 	double			Input	= 0.0;
 
-    /* RK iteration parameters */
-    const vector<double> A = {0.5, 0.5, 1.0, 1.0};
-    const vector<double> B = {0.75, 0.75, 0.0, 0.0};
+	/* RK iteration parameters */
+	const vector<double> A = {0.5, 0.5, 1.0, 1.0};
+	const vector<double> B = {0.75, 0.75, 0.0, 0.0};
 
 	/* Variables of the neuron */
 	vector<double> 	Vd		= _INIT(E_L),		/* Dendritic membrane voltage			*/
@@ -207,10 +176,24 @@ private:
 					n_K		= _INIT(0.0),   	/* activation 	of K  channel			*/
 					s_AMPA	= _INIT(0.0),   	/* Fraction of open AMPA channels		*/
 					s_NMDA	= _INIT(0.0),   	/* Fraction of open NMDA channels		*/
-                    x_NMDA	= _INIT(0.0);   	/* Two stage activation of NMDA channels*/
+					x_NMDA	= _INIT(0.0);   	/* Two stage activation of NMDA channels*/
 
-    friend class Inhibitory_Neuron;
-    friend class Thalamocortical_Neuron;
+	/* Other neuron types that recieve input from this neuron type */
+	friend class Inhibitory_Neuron;
+	friend class Thalamocortical_Neuron;
+	friend class Reticular_Neuron;
+
+	friend void get_data(int counter,
+						 vector<Pyramidal_Neuron>& PY,
+						 vector<Inhibitory_Neuron>& IN,
+						 vector<Thalamocortical_Neuron>& TC,
+						 vector<Reticular_Neuron>& RE,
+						 vector<double*> pData);
+
+	friend void connectNeurons(vector<Pyramidal_Neuron>& PY,
+							   vector<Inhibitory_Neuron>& IN,
+							   vector<Thalamocortical_Neuron>& TC,
+							   vector<Reticular_Neuron>& RE);
 };
 
 #endif // PYRAMIDAL_NEURON_H

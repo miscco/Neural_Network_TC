@@ -1,5 +1,5 @@
 /*
-*	Copyright (c) 2015 Michael Schellenberger Costa mschellenbergercosta@gmail.com
+*	Copyright (c) 2016 Michael Schellenberger Costa mschellenbergercosta@gmail.com
 *
 *	Permission is hereby granted, free of charge, to any person obtaining a copy
 *	of this software and associated documentation files (the "Software"), to deal
@@ -25,45 +25,37 @@
 /****************************************************************************************************/
 #pragma once
 #include <vector>
-#include "Pyramidal_Neuron.h"
 #include "Inhibitory_Neuron.h"
+#include "Pyramidal_Neuron.h"
+#include "Reticular_Neuron.h"
+#include "Thalamocortical_Neuron.h"
 using std::vector;
 /****************************************************************************************************/
 /*											Save data												*/
 /****************************************************************************************************/
-inline void get_data(int counter, vector<Pyramidal_Neuron>& PY, vector<Inhibitory_Neuron>& IN,
+inline void get_data(int counter,
+					 vector<Pyramidal_Neuron>& PY,
+					 vector<Inhibitory_Neuron>& IN,
+					 vector<Thalamocortical_Neuron>& TC,
+					 vector<Reticular_Neuron>& RE,
 					 vector<double*> pData) {
+
 	/* Parameters for the parallelization */
 	extern const int N_Cores;
-	extern const int N_e, N_i;
+
 	/* NOTE As C++ and Matlab have a different storage order (Row-major vs Column-major), the index
 	 * has to be adapted! For an NxM matrix A, element A(i,j) is accessed by A(j+i*M) rather than
 	 * the usual A(i+j*N)
 	 */
 	#pragma omp parallel for num_threads(N_Cores) schedule(static)
-	for(int i=0; i<N_e; ++i)
-		pData[0][i+N_e*counter] = PY[i].Vs[0];
+	for(unsigned i=0; i < PY.size(); i++)
+		pData[0][i+PY.size()*counter] = PY[i].Vs[0];
 	#pragma omp parallel for num_threads(N_Cores) schedule(static)
-	for(int i=0; i<N_i; ++i)
-		pData[1][i+N_i*counter] = IN[i].V [0];
+	for(unsigned i=0; i < IN.size(); i++)
+		pData[1][i+IN.size()*counter] = IN[i].V [0];
 	#pragma omp parallel for num_threads(N_Cores) schedule(static)
-	for(int i=0; i<N_e; ++i)
-		pData[2][i+N_e*counter] = PY[i].Ca[0];
-}
-/****************************************************************************************************/
-/*										 		end													*/
-/****************************************************************************************************/
-
-
-/****************************************************************************************************/
-/*									Create MATLAB data container									*/
-/****************************************************************************************************/
-mxArray* SetMexArray(int N, int M) {
-	mxArray* Array	= mxCreateDoubleMatrix(0, 0, mxREAL);
-	mxSetM(Array, N);
-	mxSetN(Array, M);
-	mxSetData(Array, mxMalloc(sizeof(double)*M*N));
-	return Array;
+	for(unsigned i=0; i < PY.size(); i++)
+		pData[2][i+PY.size()*counter] = PY[i].Ca[0];
 }
 /****************************************************************************************************/
 /*										 		end													*/
