@@ -31,34 +31,33 @@
 #include "Reticular_Neuron.h"
 #include "Thalamocortical_Neuron.h"
 
-using std::vector;
 /****************************************************************************************************/
 /*											Save data												*/
 /****************************************************************************************************/
 inline void get_data(int counter,
-					 vector<Pyramidal_Neuron>& PY,
-					 vector<Inhibitory_Neuron>& IN,
-					 vector<Thalamocortical_Neuron>& TC,
-					 vector<Reticular_Neuron>& RE,
-					 vector<double*> pData) {
-	/* Parameters for the parallelization */
-	extern const int N_Cores;
+                     std::vector<Pyramidal_Neuron>& PY,
+                     std::vector<Inhibitory_Neuron>& IN,
+                     std::vector<Thalamocortical_Neuron>& TC,
+                     std::vector<Reticular_Neuron>& RE,
+                     std::vector<double*> pData) {
+    /* Parameters for the parallelization */
+    extern const int N_Cores;
 
-	/* NOTE As C++ and Matlab have a different storage order (Row-major vs Column-major), the index
-	 * has to be adapted! For an NxM matrix A, element A(i,j) is accessed by A(j+i*M) rather than
-	 * the usual A(i+j*N)
-	 */
-	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
-	for(unsigned i=0; i < PY.size(); i++)
-		pData[0][i+PY.size()*counter] = PY[i].Vs[0];
+    /* NOTE As C++ and Matlab have a different storage order (Row-major vs Column-major), the index
+     * has to be adapted! For an NxM matrix A, element A(i,j) is accessed by A(j+i*M) rather than
+     * the usual A(i+j*N)
+     */
+    #pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
+    for(unsigned i=0; i < PY.size(); i++)
+        pData[0][i+PY.size()*counter] = PY[i].Vs[0];
 
-	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
-	for(unsigned i=0; i < IN.size(); i++)
-		pData[1][i+IN.size()*counter] = IN[i].V [0];
+    #pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
+    for(unsigned i=0; i < IN.size(); i++)
+        pData[1][i+IN.size()*counter] = IN[i].V [0];
 
-	#pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
-	for(unsigned i=0; i < PY.size(); i++)
-		pData[2][i+PY.size()*counter] = PY[i].Ca[0];
+    #pragma omp parallel for num_threads(N_Cores) schedule(dynamic)
+    for(unsigned i=0; i < PY.size(); i++)
+        pData[2][i+PY.size()*counter] = PY[i].Ca[0];
 }
 /****************************************************************************************************/
 /*										 		end													*/
