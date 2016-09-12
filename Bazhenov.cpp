@@ -22,10 +22,10 @@
 
 /****************************************************************************************************/
 /*		Main file for compilation tests																*/
-/*		The Simulation requires the following boost libraries:	Random								*/
 /****************************************************************************************************/
 #include <iostream>
 #include <chrono>
+#include <vector>
 
 #include "Data_Storage.h"
 #include "Initialize_Neurons.h"
@@ -38,11 +38,11 @@ typedef std::chrono::high_resolution_clock::time_point timer;
 extern const int T		= 1;								/* Simulation length in s				*/
 extern const int res 	= 5E4;								/* Number of iteration steps per s		*/
 extern const double dt 	= 1E3/res;							/* Duration of a timestep in ms			*/
-extern const vector<int> NumCells = {128,					/* Number of pyramidal cells			*/
-									 32,					/* Number of inhibitory cells			*/
-									 128,					/* Number of thalamocortical cells		*/
-									 32};					/* Number of reticular cells			*/
-extern const int N_Cores= 5;								/* Number of CPU cores					*/
+extern const std::vector<int> NumCells = {128,				/* Number of pyramidal cells			*/
+                                         32,				/* Number of inhibitory cells			*/
+                                         128,				/* Number of thalamocortical cells		*/
+                                         32};				/* Number of reticular cells			*/
+extern const int N_Cores= 7;								/* Number of CPU cores					*/
 /****************************************************************************************************/
 /*										 		end			 										*/
 /****************************************************************************************************/
@@ -52,28 +52,32 @@ extern const int N_Cores= 5;								/* Number of CPU cores					*/
 /*										Main simulation routine										*/
 /****************************************************************************************************/
 int main(void) {
+    /* Seed the random number generator */
+    srand(time(NULL));
 
-	/* Initialize the populations */
-	/* Take the time of the simulation */
-	timer start,end;
-	vector<Pyramidal_Neuron> PY(0);
-	vector<Inhibitory_Neuron> IN(0);
-	vector<Thalamocortical_Neuron> TC(0);
-	vector<Reticular_Neuron> RE(0);
-	setupNetwork(PY, IN, TC, RE);
+    /* Initialize the populations */
+    /* Take the time of the simulation */
+    timer start,end;
 
-	/* Simulation */
-	start = std::chrono::high_resolution_clock::now();
-	for (int t=0; t< T*res; ++t) {
-		Iterate_ODE(PY, IN, TC, RE);
-	}
-	end = std::chrono::high_resolution_clock::now();
+    /* Initialize the neurons */
+    std::vector<Pyramidal_Neuron> PY;
+    std::vector<Inhibitory_Neuron> IN;
+    std::vector<Thalamocortical_Neuron> TC;
+    std::vector<Reticular_Neuron> RE;
+    setupNetwork(PY, IN, TC, RE);
 
-	/* Time consumed by the simulation */
-	double dif = 1E-3*std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count();
-	std::cout << "simulation done!\n";
-	std::cout << "took " << dif 	<< " seconds" << "\n";
-	std::cout << "end\n";
+    /* Simulation */
+    start = std::chrono::high_resolution_clock::now();
+    for (int t = 0; t < T*res; ++t) {
+        Iterate_ODE(PY, IN, TC, RE);
+    }
+    end = std::chrono::high_resolution_clock::now();
+
+    /* Time consumed by the simulation */
+    double dif = 1E-3*std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count();
+    std::cout << "simulation done!\n";
+    std::cout << "took " << dif 	<< " seconds" << "\n";
+    std::cout << "end\n";
 }
 /****************************************************************************************************/
 /*										 		end			 										*/

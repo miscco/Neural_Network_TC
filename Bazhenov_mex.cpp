@@ -30,6 +30,8 @@
 #include "mex.h"
 #include "matrix.h"
 
+#include <vector>
+
 #include "Data_Storage.h"
 #include "Initialize_Neurons.h"
 #include "Iterate_ODE.h"
@@ -37,15 +39,15 @@
 /****************************************************************************************************/
 /*										Fixed simulation settings									*/
 /****************************************************************************************************/
-extern const int T		= 10;								/* Simulation length in s				*/
-extern const int res 	= 5E4;								/* Number of iteration steps per s		*/
-extern const int red 	= 1E1;								/* Fraction of stime steps saved		*/
-extern const double dt 	= 1E3/res;							/* Duration of a timestep in ms			*/
-extern const int N_e	= 128;								/* Number of pyramidal  cells			*/
-extern const int N_i	= 32;								/* Number of inhibitory cells			*/
-extern const int N_t	= 128;								/* Number of thalamocortical cells		*/
-extern const int N_r	= 32;								/* Number of thalamic reticular cells	*/
-extern const int N_Cores= 7;								/* Number of CPU cores					*/
+typedef std::chrono::high_resolution_clock::time_point timer;
+extern const int T		= 1;					/* Simulation length in s			*/
+extern const int res 	= 5E4;					/* Number of iteration steps per s	*/
+extern const double dt 	= 1E3/res;				/* Duration of a timestep in ms		*/
+extern const std::vector<int> NumCells = {128,  /* Number of pyramidal cells		*/
+                                          32,	/* Number of inhibitory cells		*/
+                                          128,	/* Number of thalamocortical cells	*/
+                                          32};	/* Number of reticular cells		*/
+extern const int N_Cores= 7;					/* Number of CPU cores				*/
 /****************************************************************************************************/
 /*										 		end			 										*/
 /****************************************************************************************************/
@@ -57,43 +59,46 @@ mxArray* SetMexArray(int N, int M);
 /*										rhs defines inputs											*/
 /****************************************************************************************************/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
-	/* Set the seed */
-	srand(time(NULL));
+    /* Seed the random number generator */
+    srand(time(NULL));
 
-	/* Initialize the populations */
-	vector<Pyramidal_Neuron> PY(0);
-	vector<Inhibitory_Neuron> IN(0);
-	vector<Thalamocortical_Neuron> TC(0);
-	vector<Reticular_Neuron> RE(0);
-	setupNetwork(PY, IN, TC, RE);
+    /* Initialize the populations */
+    std::vector<Pyramidal_Neuron> PY;
+    std::vector<Inhibitory_Neuron> IN;
+    std::vector<Thalamocortical_Neuron> TC;
+    std::vector<Reticular_Neuron> RE;
+    setupNetwork(PY, IN, TC, RE);
 
-	/* Data container in MATLAB format */
-	vector<mxArray*> Data;
-	Data.push_back(SetMexArray(N_e, T*res/red));	// Ve
-	Data.push_back(SetMexArray(N_i, T*res/red));	// Vi
-	Data.push_back(SetMexArray(N_e, T*res/red));	// Ca
+    /* Data container in MATLAB format */
+    std::vector<mxArray*> Data;
+    Data.push_back(SetMexArray(NumCells[PYRAMIDAL],  T*res/red));	// Ve
+    Data.push_back(SetMexArray(NumCells[INHIBITORY], T*res/red));	// Vi
+    Data.push_back(SetMexArray(NumCells[PYRAMIDAL],  T*res/red));	// Ca
 
-	/* Pointer to the data blocks */
-	vector<double*> pData(Data.size(), NULL);
-	for(unsigned i=0; i<Data.size(); ++i)
-		pData[i] = mxGetPr(Data[i]);
+    /* Pointer to the data blocks */
+    std::vector<double*> pData;
+    pDate.reserve(Data.size());
+    for(const auto& arrayptr : Data) {
+        pData.push_back(mxGetPr(arrayptr));
+    }
 
-	/* Simulation */
-	int count = 0;
-	for (int t=0; t< T*res; ++t) {
-		Iterate_ODE(PY, IN);
-		if(t%red==0){
-			get_data(count, PY, IN, pData);
-			count++;
-		}
+    /* Simulation */
+    int count = 0;
+    for (int t = 0; t < T*res; ++t) {
+        Iterate_ODE(PY, IN, TC, RE);
+        if(t%red==0){
+            get_data(count++, PY, IN, TC, RE, pData);
+        }
 
-	}
+    }
 
-	/* Return the data containers */
-	for(unsigned i=0; i<Data.size(); ++i)
-		plhs[i] = Data[i];
+    /* Return the data containers */
+    nlhs = Data.size();
+    for(const auto& arrayptr : Data) {
+        plhs[&arrayptr - Data.data()] = arrayptr;
+    }
 
-	return;
+    return;
 }
 /****************************************************************************************************/
 /*										 		end			 										*/
@@ -104,11 +109,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 /*									Create MATLAB data container									*/
 /****************************************************************************************************/
 mxArray* SetMexArray(int N, int M) {
-	mxArray* Array	= mxCreateDoubleMatrix(0, 0, mxREAL);
-	mxSetM(Array, N);
-	mxSetN(Array, M);
-	mxSetData(Array, mxMalloc(sizeof(double)*M*N));
-	return Array;
+    mxArray* Array	= mxCreateDoubleMatrix(0, 0, mxREAL);
+    mxSetM(Array, N);
+    mxSetN(Array, M);
+    mxSetData(Array, mxMalloc(sizeof(double)*M*N));
+    return Array;
 }
 /****************************************************************************************************/
 /*										 		end													*/
