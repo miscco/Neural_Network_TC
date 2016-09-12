@@ -21,207 +21,208 @@
 */
 #ifndef INITIALIZE_Neurons_H
 #define INITIALIZE_Neurons_H
-# define M_PI           3.14159265358979323846  /* pi */
+#ifndef M_PI
+#define M_PI           3.14159265358979323846  /* pi */
+#endif
 #include <cmath>
 #include <exception>
+#include <utility>
 #include <vector>
 
 #include "Random_Stream.h"
-
 #include "Inhibitory_Neuron.h"
 #include "Pyramidal_Neuron.h"
 #include "Reticular_Neuron.h"
 #include "Thalamocortical_Neuron.h"
 
-using std::vector;
-
 enum neuronType {
-	PYRAMIDAL = 0,
-	INHIBITORY,
-	THALAMOCORTICAL,
-	RETICULAR
+    PYRAMIDAL = 0,
+    INHIBITORY,
+    THALAMOCORTICAL,
+    RETICULAR
 };
 
-static vector<vector<double>> getParameterDistribution(neuronType Type) {
-	srand(time(NULL));
+static std::vector<double> getParameters(neuronType Type) {
+    /* Pair containing mean and standard deviation of a gaussian distribution.*/
+    std::vector<std::pair<double, double>> parameterDistribution;
 
-	extern const vector<int> NumCells;
-	vector<vector<double>> param;
-	vector<double> mP, dP;
+    /* Get the distributions of the initial parameters */
+    switch(Type) {
+    case PYRAMIDAL:
+        parameterDistribution = {std::make_pair(-60.95, 0.3),        /* E_L  */
+                                 std::make_pair(66.7E-3, 6.7E-3),    /* g_L  */
+                                 std::make_pair(1.75E-3, 0.1E-3)};   /* g_sd */
+        break;
+    case INHIBITORY:
+        parameterDistribution = {std::make_pair(-63.8, 0.15),        /* E_L */
+                                 std::make_pair(102.5E-3, 2.5E-3)};  /* g_L */
+        break;
+    case THALAMOCORTICAL:
+        parameterDistribution = {std::make_pair(-60.95, 0.3),        /* E_L */
+                                 std::make_pair(66.7E-3, 6.7E-3)};   /* g_L */
+        break;
+    case RETICULAR:
+        parameterDistribution = {std::make_pair(-63.8, 0.15),        /* E_L */
+                                 std::make_pair(102.5E-3, 2.5E-3)};  /* g_L */
+        break;
+    default:
+        throw std::runtime_error("Unknown neuron type!");
+    }
 
-	/* Get the distributions of the initial parameters */
-	switch(Type) {
-	case PYRAMIDAL:
-		param = vector<vector<double>>(NumCells[PYRAMIDAL], vector<double>(3));
-		/* E_L, g_L , g_sd */
-		mP	= {-60.95, 66.7E-3, 1.75E-3};
-		dP	= {0.3, 6.7E-3, 0.1E-3};
-		break;
-	case INHIBITORY:
-		param= vector<vector<double>>(NumCells[INHIBITORY], vector<double>(2));
-		/* E_L, g_L */
-		mP	= {-63.8, 102.5E-3};
-		dP	= {0.15, 2.5E-3};
-		break;
-	case THALAMOCORTICAL:
-		param = vector<vector<double>>(NumCells[THALAMOCORTICAL], vector<double>(2));
-		/* E_L, g_L */
-		mP	= {-60.95, 66.7E-3};
-		dP	= {0.3, 6.7E-3};
-		break;
-	case RETICULAR:
-		param= vector<vector<double>>(NumCells[RETICULAR], vector<double>(2));
-		/* E_L, g_L */
-		mP	= {-63.8, 102.5E-3};
-		dP	= {0.15, 2.5E-3};
-		break;
-	default:
-		throw std::runtime_error("Unknown neuron type!");
-	}
+    /* Initialize the random number generators */
+    std::vector<random_stream_normal> MTRand;
+    MTRand.reserve(parameterDistribution.size());
+    for (auto &dist : parameterDistribution) {
+        MTRand.push_back(random_stream_normal(dist.first, dist.second));
+    }
 
-	/* Initialize the random number generators */
-	vector<random_stream_normal> MTRand;
-	for(unsigned i=0; i<mP.size(); i++) {
-		MTRand.push_back(random_stream_normal(mP[i], dP[i]));
-	}
-
-	/* Get the randomly distributed parameters */
-	for(unsigned i=0; i<param.size(); i++)
-		for(unsigned j=0; j<mP.size(); ++j)
-			param[i][j] = MTRand[j]();
-
-	return param;
+    /* Get the randomly distributed parameters */
+    std::vector<double> parameter;
+    parameter.reserve(parameterDistribution.size());
+    for(auto &RNG : MTRand) {
+        parameter.push_back(RNG());
+    }
+    return parameter;
 }
 
 template<class NEURON>
-static vector<NEURON> initializeNeurons(neuronType type) {
-	extern const vector<int> NumCells;
+static std::vector<NEURON> initializeNeurons(neuronType type) {
+    extern const std::vector<int> NumCells;
 
-	/* Generate the randomly distributed parameter values */
-	vector<vector<double>> param = getParameterDistribution(type);
+    /* Initialize the neurons */
+    std::vector<NEURON> neurons;
+    neurons.reserve(NumCells[type]);
+    for (int i = 0; i < NumCells[type]; ++i) {
+        neurons.push_back(NEURON(getParameters(type)));
+    }
+    return neurons;
+}
 
-	/* Initialize the neurons */
-	vector<NEURON> neurons;
-	for (int i=0; i<NumCells[type]; i++)
-		neurons.push_back(NEURON(param[i]));
+static std::vector<std::vector<int>> getConnectivity(neuronType post, neuronType pre) {
+    using connectome = std::vector<std::vector<int>>;
+    extern const std::vector<int> NumCells;
 
-	return neurons;
+    double length = 5*NumCells[PYRAMIDAL];
+    /* Sigma for the normal distribution */
+    double sigma;
+    switch (pre) {
+    case PYRAMIDAL:
+        sigma = 250/length*NumCells[post];
+        break;
+    case INHIBITORY:
+        sigma = 125/length*NumCells[post];
+        break;
+    case THALAMOCORTICAL:
+        sigma = 125/length*NumCells[post];
+        break;
+    case RETICULAR:
+        sigma = 125/length*NumCells[post];
+        break;
+    default:
+        throw std::runtime_error("Unknown connection type!");
+    }
+
+    /* Generate the random number generator for the number of connections */
+    random_stream_normal MTRand_N  = random_stream_normal(20, 5);
+
+    /* Generate the random number generator for the target neurons */
+    random_stream_normal MTRand_T = random_stream_normal(0, sigma);
+
+    connectome connectivity(NumCells[post], std::vector<int>(0));
+    for (int i=0; i < NumCells[pre]; ++i) {
+        unsigned N_con = (abs((int)MTRand_N()));
+        for(unsigned j=0; j < N_con; ++j) {
+            int Target;
+            /* Self connections are not allowed */
+            do {
+                Target = ((int)MTRand_T()+i)%NumCells[post];
+                if(Target < 0) {
+                    Target += NumCells[post];
+                }
+            } while (Target == i && pre == post);
+            connectivity[Target].push_back(i);
+        }
+    }
+    return connectivity;
+}
+
+void connectNeurons(std::vector<Pyramidal_Neuron>& PY,
+                    std::vector<Inhibitory_Neuron>& IN,
+                    std::vector<Thalamocortical_Neuron>& TC,
+                    std::vector<Reticular_Neuron>& RE) {
+    using connectome = std::vector<std::vector<int>>;
+    /* Generate random connectivity matrices. For every Neuron[i] they store
+     * the index of all neurons it RECEIVES input from
+     */
+    connectome conPP = getConnectivity(PYRAMIDAL, PYRAMIDAL);
+    connectome conPI = getConnectivity(PYRAMIDAL, INHIBITORY);
+    connectome conPT = getConnectivity(PYRAMIDAL, THALAMOCORTICAL);
+    for (Pyramidal_Neuron &neuron : PY) {
+        for (int connection : conPP.at(&neuron - PY.data())) {
+            neuron.PY_Con.push_back(&PY.at(connection));
+        }
+        for (int connection : conPI.at(&neuron - PY.data())) {
+            neuron.IN_Con.push_back(&IN.at(connection));;
+        }
+        for (int connection : conPT.at(&neuron - PY.data())) {
+            neuron.TC_Con.push_back(&TC.at(connection));
+        }
+    }
+
+    connectome conIP = getConnectivity(INHIBITORY, PYRAMIDAL);
+    connectome conII = getConnectivity(INHIBITORY, INHIBITORY);
+    connectome conIT = getConnectivity(INHIBITORY, THALAMOCORTICAL);
+    for (Inhibitory_Neuron &neuron : IN) {
+        for (int connection : conIP.at(&neuron - IN.data())) {
+            neuron.PY_Con.push_back(&PY.at(connection));
+        }
+        for (int connection : conII.at(&neuron - IN.data())) {
+            neuron.IN_Con.push_back(&IN.at(connection));;
+        }
+        for (int connection : conIT.at(&neuron - IN.data())) {
+            neuron.TC_Con.push_back(&TC.at(connection));
+        }
+    }
+
+    connectome conTR = getConnectivity(THALAMOCORTICAL, RETICULAR);
+    connectome conTP = getConnectivity(THALAMOCORTICAL, PYRAMIDAL);
+    for (Thalamocortical_Neuron &neuron : TC) {
+        for (int connection : conTP.at(&neuron - TC.data())) {
+            neuron.PY_Con.push_back(&PY.at(connection));
+        }
+        for (int connection : conTR.at(&neuron - TC.data())) {
+            neuron.RE_Con.push_back(&RE.at(connection));;
+        }
+    }
+
+    connectome conRT = getConnectivity(RETICULAR, THALAMOCORTICAL);
+    connectome conRR = getConnectivity(RETICULAR, RETICULAR);
+    connectome conRP = getConnectivity(RETICULAR, PYRAMIDAL);
+    for (Reticular_Neuron &neuron : RE) {
+        for (int connection : conRP.at(&neuron - RE.data())) {
+            neuron.PY_Con.push_back(&PY.at(connection));
+        }
+        for (int connection : conRR.at(&neuron - RE.data())) {
+            neuron.RE_Con.push_back(&RE.at(connection));;
+        }
+        for (int connection : conRT.at(&neuron - RE.data())) {
+            neuron.TC_Con.push_back(&TC.at(connection));
+        }
+    }
 }
 
 
-static vector<vector<int>> getConnectivity(neuronType post, neuronType pre) {
-	extern const vector<int> NumCells;
-	double length = 5*NumCells[PYRAMIDAL];
-	/* Sigma for the normal distribution */
-	double sigma;
-	switch (pre) {
-	case PYRAMIDAL:
-		sigma = 250/length*NumCells[post];
-		break;
-	case INHIBITORY:
-		sigma = 125/length*NumCells[post];
-		break;
-	case THALAMOCORTICAL:
-		sigma = 125/length*NumCells[post];
-		break;
-	case RETICULAR:
-		sigma = 125/length*NumCells[post];
-		break;
-	default:
-		throw std::runtime_error("Unknown connection type!");
-	}
+void setupNetwork(std::vector<Pyramidal_Neuron>& PY,
+                  std::vector<Inhibitory_Neuron>& IN,
+                  std::vector<Thalamocortical_Neuron>& TC,
+                  std::vector<Reticular_Neuron>& RE) {
+    /* Initialize the individual neurons */
+    PY = initializeNeurons<Pyramidal_Neuron>(PYRAMIDAL);
+    IN = initializeNeurons<Inhibitory_Neuron>(INHIBITORY);
+    TC = initializeNeurons<Thalamocortical_Neuron>(THALAMOCORTICAL);
+    RE = initializeNeurons<Reticular_Neuron>(RETICULAR);
 
-	/* Generate the random number generator for the number of connections */
-	random_stream_normal MTRand_N  = random_stream_normal(20, 5);
-
-	/* Generate the random number generator for the target neurons */
-	random_stream_normal MTRand_T = random_stream_normal(0, sigma);
-
-	vector<vector<int>> connectivity(NumCells[post], vector<int>(0));
-	for (int i=0; i < NumCells[pre]; i++) {
-		unsigned N_con = (abs((int)MTRand_N()));
-		for(unsigned j=0; j < N_con; j++) {
-			int Target;
-			/* Self connections are not allowed */
-			do {
-				Target = ((int)MTRand_T()+i)%NumCells[post];
-				if(Target < 0)
-					Target += NumCells[post];
-			} while (Target == i && pre == post);
-			connectivity[Target].push_back(i);
-		}
-	}
-	return connectivity;
-}
-
-void connectNeurons(vector<Pyramidal_Neuron>& PY,
-					vector<Inhibitory_Neuron>& IN,
-					vector<Thalamocortical_Neuron>& TC,
-					vector<Reticular_Neuron>& RE) {
-	/* Generate random connectivity matrices. For every Neuron[i] they store
-	 * the index of all neurons it RECEIVES input from
-	 */
-	vector<vector<int>> conPP = getConnectivity(PYRAMIDAL, PYRAMIDAL);
-	vector<vector<int>> conPI = getConnectivity(PYRAMIDAL, INHIBITORY);
-	vector<vector<int>> conPT = getConnectivity(PYRAMIDAL, THALAMOCORTICAL);
-	for (unsigned i=0; i < PY.size(); i++) {
-		for (unsigned j=0; j < conPP[i].size(); j++)
-			PY[i].PY_Con.push_back(&PY[conPP[i][j]]);
-		for (unsigned j=0; j < conPI[i].size(); j++)
-			PY[i].IN_Con.push_back(&IN[conPI[i][j]]);
-		for (unsigned j=0; j < conPT[i].size(); j++)
-			PY[i].TC_Con.push_back(&TC[conPT[i][j]]);
-	}
-
-	vector<vector<int>> conIP = getConnectivity(INHIBITORY, PYRAMIDAL);
-	vector<vector<int>> conII = getConnectivity(INHIBITORY, INHIBITORY);
-	vector<vector<int>> conIT = getConnectivity(INHIBITORY, THALAMOCORTICAL);
-	for (unsigned i=0; i < IN.size(); i++) {
-		for (unsigned j=0; j < conIP[i].size(); j++)
-			IN[i].PY_Con.push_back(&PY[conIP[i][j]]);
-		for (unsigned j=0; j < conII[i].size(); j++)
-			IN[i].IN_Con.push_back(&IN[conII[i][j]]);
-		for (unsigned j=0; j < conIT[i].size(); j++)
-			IN[i].TC_Con.push_back(&TC[conIT[i][j]]);
-	}
-
-	vector<vector<int>> conTR = getConnectivity(THALAMOCORTICAL, RETICULAR);
-	vector<vector<int>> conTP = getConnectivity(THALAMOCORTICAL, PYRAMIDAL);
-	for (unsigned i=0; i < TC.size(); i++) {
-		for (unsigned j=0; j < conTR[i].size(); j++)
-			TC[i].RE_Con.push_back(&RE[conTR[i][j]]);
-		for (unsigned j=0; j < conTP[i].size(); j++)
-			TC[i].PY_Con.push_back(&PY[conTP[i][j]]);
-	}
-
-	vector<vector<int>> conRT = getConnectivity(RETICULAR, THALAMOCORTICAL);
-	vector<vector<int>> conRR = getConnectivity(RETICULAR, RETICULAR);
-	vector<vector<int>> conRP = getConnectivity(RETICULAR, PYRAMIDAL);
-	for (unsigned i=0; i < RE.size(); i++) {
-		for (unsigned j=0; j < conRT[i].size(); j++)
-			RE[i].TC_Con.push_back(&TC[conRT[i][j]]);
-		for (unsigned j=0; j < conRR[i].size(); j++)
-			RE[i].RE_Con.push_back(&RE[conRR[i][j]]);
-		for (unsigned j=0; j < conRP[i].size(); j++)
-			RE[i].PY_Con.push_back(&PY[conRP[i][j]]);
-	}
-}
-
-
-void setupNetwork(vector<Pyramidal_Neuron>& PY,
-				  vector<Inhibitory_Neuron>& IN,
-				  vector<Thalamocortical_Neuron>& TC,
-				  vector<Reticular_Neuron>& RE) {
-	/* Seed the random number generator */
-	srand(time(NULL));
-
-	/* Initialize the individual neurons */
-	PY = initializeNeurons<Pyramidal_Neuron>(PYRAMIDAL);
-	IN = initializeNeurons<Inhibitory_Neuron>(INHIBITORY);
-	TC = initializeNeurons<Thalamocortical_Neuron>(THALAMOCORTICAL);
-	RE = initializeNeurons<Reticular_Neuron>(RETICULAR);
-
-	connectNeurons(PY, IN, TC, RE);
+    connectNeurons(PY, IN, TC, RE);
 }
 
 #endif // INITIALIZE_Neurons_H
